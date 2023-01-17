@@ -1,0 +1,26 @@
+echo "Getting the root and issuer certificates from vault..."
+    curl --header "X-Vault-Token: ${VAULT_TOKEN}"  --request GET ${VAULT_URL}v1/secret/data/certificate > ${TMP_FOLDER}/vault-certificate-response.json
+    if grep errors ${TMP_FOLDER}/vault-certificate-response.json
+    then
+        echo "Vault request failed. Response payload: $(cat ${TMP_FOLDER}/vault-certificate-response.json)"
+        exit 1
+    else
+        echo "No errors found in the Vault response."
+    fi
+
+    cat ${TMP_FOLDER}/vault-certificate-response.json | jq -r '.data.data["root_ca1.crt"]'  > ${SECRETS_FOLDER}/root_ca1.crt
+    cat ${TMP_FOLDER}/vault-certificate-response.json | jq -r '.data.data["sub_ca1.crt"]'  > ${SECRETS_FOLDER}/sub_ca1.crt
+
+    echo "Importing the root and issuer certificates to truststore..."
+    keytool -import -alias root -keystore ${TRUSTSTORE_OUTPUT_FILE} -noprompt -trustcacerts -file ${SECRETS_FOLDER}/root_ca1.crt -storepass ${STORE_PASSWORD}
+    keytool -import -alias sub -keystore ${TRUSTSTORE_OUTPUT_FILE} -noprompt -trustcacerts -file ${SECRETS_FOLDER}/sub_ca1.crt -storepass ${STORE_PASSWORD}
+
+    chmod 740 ${KEYSTORE_OUTPUT_FILE}
+    chmod 740 ${TRUSTSTORE_OUTPUT_FILE}
+    chmod 740 ${STORE_PASSWORD_FILE}
+
+    echo "Key store available in: ${KEYSTORE_OUTPUT_FILE} (KEYSTORE_OUTPUT_FILE variable)"
+    echo "Trust store available in: ${TRUSTSTORE_OUTPUT_FILE} (TRUSTSTORE_OUTPUT_FILE variable)"
+    echo "Store password available in: ${STORE_PASSWORD_FILE} (STORE_PASSWORD_FILE or STORE_PASSWORD variables)"
+
+    echo "Process ended."
